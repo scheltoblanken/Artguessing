@@ -1,0 +1,600 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Art Guesser</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --cream: #f5f0e8;
+    --ink: #1a1510;
+    --gold: #c9a84c;
+    --gold-light: #e8d5a3;
+    --rust: #8b3a2a;
+    --muted: #7a6e5f;
+    --card: #fffdf7;
+    --border: #d9cfc0;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--cream);
+    color: var(--ink);
+    font-family: 'DM Sans', sans-serif;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  /* noise texture overlay */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  header {
+    width: 100%;
+    padding: 2rem 2rem 1rem;
+    text-align: center;
+    border-bottom: 1px solid var(--border);
+    position: relative;
+    z-index: 1;
+  }
+
+  .logo {
+    font-family: 'Playfair Display', serif;
+    font-size: clamp(2rem, 5vw, 3.2rem);
+    letter-spacing: -0.02em;
+    color: var(--ink);
+  }
+
+  .logo span {
+    color: var(--gold);
+    font-style: italic;
+  }
+
+  .tagline {
+    font-size: 0.85rem;
+    color: var(--muted);
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    margin-top: 0.25rem;
+  }
+
+  .score-bar {
+    display: flex;
+    gap: 1.5rem;
+    justify-content: center;
+    margin-top: 1rem;
+    font-size: 0.8rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  .score-bar strong {
+    color: var(--ink);
+    font-family: 'Playfair Display', serif;
+    font-size: 1.1rem;
+  }
+
+  main {
+    width: 100%;
+    max-width: 780px;
+    padding: 2.5rem 1.5rem 4rem;
+    position: relative;
+    z-index: 1;
+  }
+
+  /* Loading */
+  #loading {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1rem;
+    padding: 5rem 0;
+  }
+
+  .spinner {
+    width: 36px;
+    height: 36px;
+    border: 2px solid var(--border);
+    border-top-color: var(--gold);
+    border-radius: 50%;
+    animation: spin 0.9s linear infinite;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .loading-text {
+    font-size: 0.85rem;
+    color: var(--muted);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+
+  /* Game card */
+  #game { display: none; }
+
+  .round-label {
+    font-size: 0.75rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 1.25rem;
+  }
+
+  .painting-frame {
+    background: var(--ink);
+    padding: 12px;
+    border-radius: 2px;
+    box-shadow: 8px 8px 0 var(--border), 16px 16px 0 rgba(0,0,0,0.06);
+    margin-bottom: 2rem;
+    position: relative;
+  }
+
+  .painting-frame img {
+    width: 100%;
+    max-height: 420px;
+    object-fit: contain;
+    display: block;
+    background: #111;
+  }
+
+  .question {
+    font-family: 'Playfair Display', serif;
+    font-size: clamp(1.1rem, 3vw, 1.4rem);
+    margin-bottom: 1.5rem;
+    line-height: 1.4;
+  }
+
+  .options {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.75rem;
+    margin-bottom: 2rem;
+  }
+
+  @media (max-width: 500px) {
+    .options { grid-template-columns: 1fr; }
+  }
+
+  .option-btn {
+    background: var(--card);
+    border: 1.5px solid var(--border);
+    border-radius: 2px;
+    padding: 0.9rem 1.1rem;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.9rem;
+    color: var(--ink);
+    cursor: pointer;
+    text-align: left;
+    transition: border-color 0.15s, background 0.15s, transform 0.1s;
+    line-height: 1.4;
+  }
+
+  .option-btn:hover:not(:disabled) {
+    border-color: var(--gold);
+    background: #fffbf0;
+    transform: translateY(-1px);
+  }
+
+  .option-btn.correct {
+    background: #f0f7ec;
+    border-color: #5a8a4a;
+    color: #2d5a1e;
+  }
+
+  .option-btn.wrong {
+    background: #fdf0ee;
+    border-color: var(--rust);
+    color: var(--rust);
+  }
+
+  .option-btn:disabled { cursor: default; }
+
+  .feedback {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.05rem;
+    font-style: italic;
+    margin-bottom: 1.5rem;
+    min-height: 1.5rem;
+    color: var(--muted);
+  }
+
+  .feedback.correct { color: #3d6b2e; }
+  .feedback.wrong { color: var(--rust); }
+
+  .hint-box {
+    background: var(--card);
+    border-left: 3px solid var(--gold);
+    padding: 0.75rem 1rem;
+    font-size: 0.85rem;
+    color: var(--muted);
+    line-height: 1.6;
+    margin-bottom: 1.5rem;
+    display: none;
+  }
+
+  .bottom-row {
+    display: flex;
+    gap: 0.75rem;
+    align-items: center;
+  }
+
+  .next-btn {
+    background: var(--ink);
+    color: var(--cream);
+    border: none;
+    border-radius: 2px;
+    padding: 0.8rem 2rem;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.9rem;
+    letter-spacing: 0.05em;
+    cursor: pointer;
+    transition: background 0.15s;
+    display: none;
+  }
+
+  .next-btn:hover { background: #2d2820; }
+
+  .hint-btn {
+    background: transparent;
+    border: 1.5px solid var(--border);
+    border-radius: 2px;
+    padding: 0.8rem 1.25rem;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.85rem;
+    color: var(--muted);
+    cursor: pointer;
+    transition: border-color 0.15s;
+  }
+
+  .hint-btn:hover { border-color: var(--gold); color: var(--ink); }
+
+  /* End screen */
+  #endscreen {
+    display: none;
+    text-align: center;
+    padding: 3rem 1rem;
+  }
+
+  .final-score {
+    font-family: 'Playfair Display', serif;
+    font-size: clamp(3rem, 10vw, 6rem);
+    color: var(--gold);
+    line-height: 1;
+    margin-bottom: 0.5rem;
+  }
+
+  .final-label {
+    font-size: 0.8rem;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 1.5rem;
+  }
+
+  .final-msg {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.3rem;
+    font-style: italic;
+    margin-bottom: 2rem;
+    color: var(--ink);
+  }
+
+  .restart-btn {
+    background: var(--ink);
+    color: var(--cream);
+    border: none;
+    border-radius: 2px;
+    padding: 0.9rem 2.5rem;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.95rem;
+    letter-spacing: 0.05em;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+
+  .restart-btn:hover { background: #2d2820; }
+
+  /* Error */
+  #error-msg {
+    display: none;
+    text-align: center;
+    padding: 3rem;
+    color: var(--rust);
+    font-family: 'Playfair Display', serif;
+    font-style: italic;
+  }
+
+  /* progress dots */
+  .progress {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 1.5rem;
+  }
+
+  .dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--border);
+    transition: background 0.3s;
+  }
+
+  .dot.done { background: var(--gold); }
+  .dot.current { background: var(--ink); }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">Art <span>Guesser</span></div>
+  <div class="tagline">Ken jij de grote meesters?</div>
+  <div class="score-bar">
+    <div>Score <strong id="score-display">0</strong></div>
+    <div>Ronde <strong id="round-display">0</strong> / <strong id="total-display">10</strong></div>
+  </div>
+</header>
+
+<main>
+  <div id="loading">
+    <div class="spinner"></div>
+    <div class="loading-text">Schilderijen ophalen...</div>
+  </div>
+
+  <div id="game">
+    <div class="round-label" id="round-label">Vraag 1 van 10</div>
+    <div class="progress" id="progress"></div>
+    <div class="painting-frame">
+      <img id="painting-img" src="" alt="Schilderij" />
+    </div>
+    <div class="question" id="question">Wie schilderde dit werk?</div>
+    <div class="options" id="options"></div>
+    <div class="feedback" id="feedback"></div>
+    <div class="hint-box" id="hint-box"></div>
+    <div class="bottom-row">
+      <button class="hint-btn" id="hint-btn" onclick="showHint()">Hint</button>
+      <button class="next-btn" id="next-btn" onclick="nextRound()">Volgende →</button>
+    </div>
+  </div>
+
+  <div id="endscreen">
+    <div class="final-score" id="final-score"></div>
+    <div class="final-label">punten behaald</div>
+    <div class="final-msg" id="final-msg"></div>
+    <button class="restart-btn" onclick="startGame()">Opnieuw spelen</button>
+  </div>
+
+  <div id="error-msg">Kon schilderijen niet ophalen. Controleer je internetverbinding.</div>
+</main>
+
+<script>
+const PAINTINGS = [
+  "The Starry Night",
+  "Girl with a Pearl Earring",
+  "The Birth of Venus",
+  "Mona Lisa",
+  "The Night Watch",
+  "The Persistence of Memory",
+  "A Sunday on La Grande Jatte",
+  "Water Lilies (Monet series)",
+  "The Scream",
+  "Las Meninas",
+  "The Great Wave off Kanagawa",
+  "American Gothic",
+  "Guernica",
+  "The Last Supper",
+  "Starry Night Over the Rhone",
+  "Impression, Sunrise",
+  "The Garden of Earthly Delights",
+  "Whistler's Mother",
+  "Café Terrace at Night",
+  "Self-Portrait with Thorn Necklace and Hummingbird",
+  "The Swing (Fragonard)",
+  "The Hay Wain",
+  "Sunflowers (Van Gogh)",
+  "The Arnolfini Portrait",
+  "Napoleon Crossing the Alps",
+];
+
+const ROUNDS = 10;
+const HEADERS = { "User-Agent": "ArtGuessingGame/1.0 (game@example.com)" };
+
+let allData = [];
+let gameData = [];
+let current = 0;
+let score = 0;
+let answered = false;
+let hintUsed = false;
+
+async function fetchPainting(title) {
+  const url = `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(title.replace(/ /g, '_'))}`;
+  const res = await fetch(url, { headers: HEADERS });
+  if (!res.ok) return null;
+  const data = await res.json();
+  if (!data.thumbnail || !data.description) return null;
+  return {
+    title: data.title,
+    description: data.description,
+    extract: data.extract ? data.extract.slice(0, 220) + '…' : '',
+    image: data.thumbnail.source.replace(/\d+px/, '600px'),
+  };
+}
+
+async function loadAll() {
+  document.getElementById('loading').style.display = 'flex';
+  document.getElementById('game').style.display = 'none';
+  document.getElementById('endscreen').style.display = 'none';
+  document.getElementById('error-msg').style.display = 'none';
+
+  const results = await Promise.all(PAINTINGS.map(p => fetchPainting(p).catch(() => null)));
+  allData = results.filter(Boolean);
+
+  if (allData.length < 8) {
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('error-msg').style.display = 'block';
+    return;
+  }
+
+  document.getElementById('total-display').textContent = ROUNDS;
+  startGame();
+}
+
+function startGame() {
+  score = 0;
+  current = 0;
+  answered = false;
+  hintUsed = false;
+
+  // shuffle and pick ROUNDS paintings
+  const shuffled = [...allData].sort(() => Math.random() - 0.5);
+  gameData = shuffled.slice(0, ROUNDS);
+
+  document.getElementById('score-display').textContent = 0;
+  document.getElementById('round-display').textContent = 1;
+  document.getElementById('loading').style.display = 'none';
+  document.getElementById('endscreen').style.display = 'none';
+  document.getElementById('game').style.display = 'block';
+
+  buildProgress();
+  showRound();
+}
+
+function buildProgress() {
+  const el = document.getElementById('progress');
+  el.innerHTML = '';
+  for (let i = 0; i < ROUNDS; i++) {
+    const dot = document.createElement('div');
+    dot.className = 'dot' + (i === 0 ? ' current' : '');
+    dot.id = `dot-${i}`;
+    el.appendChild(dot);
+  }
+}
+
+function updateProgress() {
+  for (let i = 0; i < ROUNDS; i++) {
+    const dot = document.getElementById(`dot-${i}`);
+    if (!dot) continue;
+    dot.className = 'dot' + (i < current ? ' done' : i === current ? ' current' : '');
+  }
+}
+
+function showRound() {
+  answered = false;
+  hintUsed = false;
+  const item = gameData[current];
+
+  document.getElementById('round-label').textContent = `Vraag ${current + 1} van ${ROUNDS}`;
+  document.getElementById('round-display').textContent = current + 1;
+  document.getElementById('painting-img').src = item.image;
+  document.getElementById('painting-img').alt = 'Schilderij om te raden';
+  document.getElementById('feedback').textContent = '';
+  document.getElementById('feedback').className = 'feedback';
+  document.getElementById('hint-box').style.display = 'none';
+  document.getElementById('hint-box').textContent = '';
+  document.getElementById('next-btn').style.display = 'none';
+  document.getElementById('hint-btn').disabled = false;
+
+  // decide question type: alternate between title and painter
+  const askPainter = current % 2 === 0;
+  if (askPainter) {
+    document.getElementById('question').textContent = 'Wie schilderde dit werk?';
+  } else {
+    document.getElementById('question').textContent = 'Wat is de naam van dit schilderij?';
+  }
+
+  // build options: 1 correct + 3 wrong
+  const correct = item;
+  const others = allData.filter(d => d.title !== item.title).sort(() => Math.random() - 0.5).slice(0, 3);
+  const choices = [correct, ...others].sort(() => Math.random() - 0.5);
+
+  const container = document.getElementById('options');
+  container.innerHTML = '';
+  choices.forEach(choice => {
+    const btn = document.createElement('button');
+    btn.className = 'option-btn';
+    btn.textContent = askPainter ? choice.description : choice.title;
+    btn.onclick = () => handleAnswer(btn, choice.title === correct.title, askPainter, correct);
+    container.appendChild(btn);
+  });
+
+  updateProgress();
+}
+
+function handleAnswer(btn, isCorrect, askPainter, correct) {
+  if (answered) return;
+  answered = true;
+
+  document.querySelectorAll('.option-btn').forEach(b => b.disabled = true);
+  document.getElementById('hint-btn').disabled = true;
+
+  if (isCorrect) {
+    btn.classList.add('correct');
+    const bonus = hintUsed ? '' : ' (+bonus voor geen hint)';
+    document.getElementById('feedback').textContent = 'Correct! Goed gedaan.' + bonus;
+    document.getElementById('feedback').className = 'feedback correct';
+    score += hintUsed ? 1 : 2;
+    document.getElementById('score-display').textContent = score;
+  } else {
+    btn.classList.add('wrong');
+    // highlight correct answer
+    document.querySelectorAll('.option-btn').forEach(b => {
+      const txt = b.textContent;
+      const correctTxt = askPainter ? correct.description : correct.title;
+      if (txt === correctTxt) b.classList.add('correct');
+    });
+    document.getElementById('feedback').textContent = `Niet juist. Het goede antwoord is: ${askPainter ? correct.description : correct.title}`;
+    document.getElementById('feedback').className = 'feedback wrong';
+  }
+
+  document.getElementById('next-btn').style.display = 'inline-block';
+}
+
+function showHint() {
+  if (answered || hintUsed) return;
+  hintUsed = true;
+  const item = gameData[current];
+  document.getElementById('hint-box').textContent = item.extract || 'Geen hint beschikbaar.';
+  document.getElementById('hint-box').style.display = 'block';
+  document.getElementById('hint-btn').disabled = true;
+}
+
+function nextRound() {
+  current++;
+  if (current >= ROUNDS) {
+    showEnd();
+  } else {
+    showRound();
+  }
+}
+
+function showEnd() {
+  document.getElementById('game').style.display = 'none';
+  document.getElementById('endscreen').style.display = 'block';
+  document.getElementById('final-score').textContent = score;
+
+  const max = ROUNDS * 2;
+  const pct = score / max;
+  let msg = '';
+  if (pct >= 0.9) msg = 'Meesterlijk! Je kent je kunst.';
+  else if (pct >= 0.7) msg = 'Indrukwekkend! Je hebt een scherp oog.';
+  else if (pct >= 0.5) msg = 'Niet slecht! Nog wat oefenen?';
+  else if (pct >= 0.3) msg = 'Een begin is er. Musea wachten op je!';
+  else msg = 'Kunst is voor iedereen — ook voor jou!';
+
+  document.getElementById('final-msg').textContent = msg;
+}
+
+loadAll();
+</script>
+</body>
+</html>
