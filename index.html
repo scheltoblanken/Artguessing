@@ -50,7 +50,7 @@
   .spinner { width: 32px; height: 32px; border: 2px solid var(--border); border-top-color: var(--gold); border-radius: 50%; animation: spin 0.9s linear infinite; }
   @keyframes spin { to { transform: rotate(360deg); } }
 
-  .loading-text { font-size: 0.8rem; color: var(--muted); letter-spacing: 0.1em; text-transform: uppercase; }
+  .loading-text { font-size: 0.8rem; color: var(--muted); letter-spacing: 0.1em; text-transform: uppercase; text-align: center; }
 
   .progress { display: flex; gap: 5px; margin-bottom: 1rem; }
   .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--border); transition: background 0.3s; }
@@ -72,7 +72,14 @@
     position: relative;
   }
 
-  .painting-frame img { width: 100%; max-height: 340px; object-fit: contain; display: block; background: #111; transition: opacity 0.4s; }
+  .painting-frame img {
+    width: 100%;
+    max-height: 340px;
+    object-fit: contain;
+    display: block;
+    background: #111;
+    transition: opacity 0.4s;
+  }
 
   .img-loader { position: absolute; display: flex; flex-direction: column; align-items: center; gap: 8px; }
   .img-loader span { font-size: 11px; color: #888; letter-spacing: 0.1em; text-transform: uppercase; }
@@ -107,13 +114,45 @@
   .feedback.correct { color: #3d6b2e; }
   .feedback.wrong { color: var(--rust); }
 
-  .hint-box { background: var(--card); border-left: 3px solid var(--gold); padding: 0.75rem 1rem; font-size: 0.82rem; color: var(--muted); line-height: 1.6; margin-bottom: 1rem; display: none; max-height: 110px; overflow-y: auto; }
+  .hint-box {
+    background: var(--card);
+    border-left: 3px solid var(--gold);
+    padding: 0.75rem 1rem;
+    font-size: 0.82rem;
+    color: var(--muted);
+    line-height: 1.6;
+    margin-bottom: 1rem;
+    display: none;
+    max-height: 110px;
+    overflow-y: auto;
+  }
 
-  .bottom-row { display: flex; gap: 0.6rem; align-items: center; }
+  .bottom-row { display: flex; gap: 0.6rem; align-items: center; flex-wrap: wrap; }
 
-  .next-btn { background: var(--ink); color: var(--cream); border: none; border-radius: 2px; padding: 0.75rem 1.75rem; font-family: 'DM Sans', sans-serif; font-size: 0.88rem; cursor: pointer; display: none; -webkit-tap-highlight-color: transparent; }
+  .next-btn {
+    background: var(--ink);
+    color: var(--cream);
+    border: none;
+    border-radius: 2px;
+    padding: 0.75rem 1.75rem;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.88rem;
+    cursor: pointer;
+    display: none;
+    -webkit-tap-highlight-color: transparent;
+  }
 
-  .hint-btn { background: transparent; border: 1.5px solid var(--border); border-radius: 2px; padding: 0.75rem 1rem; font-family: 'DM Sans', sans-serif; font-size: 0.82rem; color: var(--muted); cursor: pointer; -webkit-tap-highlight-color: transparent; }
+  .hint-btn {
+    background: transparent;
+    border: 1.5px solid var(--border);
+    border-radius: 2px;
+    padding: 0.75rem 1rem;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.82rem;
+    color: var(--muted);
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
 
   #endscreen { display: none; text-align: center; padding: 2.5rem 1rem; }
   .final-score { font-family: 'Playfair Display', serif; font-size: clamp(3rem, 15vw, 5.5rem); color: var(--gold); line-height: 1; margin-bottom: 0.4rem; }
@@ -139,7 +178,7 @@
 <main>
   <div id="loading">
     <div class="spinner"></div>
-    <div class="loading-text" id="loading-text">Schilderij ophalen...</div>
+    <div class="loading-text" id="loading-text">Data laden...</div>
   </div>
 
   <div id="game">
@@ -171,51 +210,90 @@
     <button class="restart-btn" onclick="startGame()">Opnieuw spelen</button>
   </div>
 
-  <div id="error-msg">Kon schilderij niet ophalen. Controleer je internetverbinding en probeer opnieuw.</div>
+  <div id="error-msg">Kon data.json niet laden. Controleer of het bestand in dezelfde map staat als index.html en probeer opnieuw.</div>
 </main>
 
 <script>
-const PAINTINGS = [
-  "The Starry Night","Girl with a Pearl Earring","The Birth of Venus",
-  "Mona Lisa","The Night Watch","The Persistence of Memory",
-  "A Sunday on La Grande Jatte","The Scream","Las Meninas",
-  "The Great Wave off Kanagawa","American Gothic","Guernica",
-  "The Last Supper","Impression, Sunrise","The Garden of Earthly Delights",
-  "Whistler's Mother","Café Terrace at Night","The Arnolfini Portrait",
-  "Napoleon Crossing the Alps","The Swing (Fragonard)",
-  "The Hay Wain","Sunflowers (Van Gogh)","Starry Night Over the Rhone",
-  "Water Lilies (Monet series)","Self-Portrait with Thorn Necklace and Hummingbird"
-];
-
 const ROUNDS = 10;
-const HEADERS = { "User-Agent": "ArtGuessingGame/1.0 (game@example.com)" };
+const DATA_URL = './data.json';
 
+let allPaintings = [];
 let pool = [];
-let cache = {};
-let usedInGame = [];
 let current = 0;
 let score = 0;
 let answered = false;
 let hintUsed = false;
 let currentItem = null;
 
-async function fetchPainting(title) {
-  if (cache[title]) return cache[title];
-  const url = `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(title.replace(/ /g,'_'))}`;
-  try {
-    const res = await fetch(url, { headers: HEADERS });
-    if (!res.ok) return null;
-    const data = await res.json();
-    if (!data.thumbnail || !data.description) return null;
-    const item = {
-      title: data.title,
-      description: data.description,
-      extract: data.extract ? data.extract.slice(0, 400) + '…' : '',
-      image: data.originalimage ? data.originalimage.source : data.thumbnail.source.replace(/\/\d+px-/, '/800px-'),
-    };
-    cache[title] = item;
-    return item;
-  } catch { return null; }
+async function loadData() {
+  const res = await fetch(DATA_URL, { cache: 'no-store' });
+  if (!res.ok) {
+    throw new Error(`Kon ${DATA_URL} niet laden (${res.status})`);
+  }
+
+  const data = await res.json();
+
+  if (!Array.isArray(data) || data.length === 0) {
+    throw new Error('data.json bevat geen geldige lijst met schilderijen.');
+  }
+
+  const cleaned = data.filter(item => (
+    item &&
+    typeof item.title === 'string' && item.title.trim() &&
+    typeof item.artist === 'string' && item.artist.trim() &&
+    typeof item.image === 'string' && item.image.trim()
+  ));
+
+  if (cleaned.length < 4) {
+    throw new Error('Er zijn te weinig geldige schilderijen voor een quiz.');
+  }
+
+  return cleaned;
+}
+
+function shuffle(array) {
+  const copy = [...array];
+  for (let i = copy.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [copy[i], copy[j]] = [copy[j], copy[i]];
+  }
+  return copy;
+}
+
+function preloadImage(src) {
+  if (!src) return;
+  const img = new Image();
+  img.src = src;
+}
+
+function getUniqueWrongArtistOptions(correctItem) {
+  const used = new Set([correctItem.artist]);
+  const options = [];
+
+  for (const item of shuffle(allPaintings)) {
+    if (item.title === correctItem.title) continue;
+    if (used.has(item.artist)) continue;
+    used.add(item.artist);
+    options.push(item.artist);
+    if (options.length === 3) break;
+  }
+
+  return options;
+}
+
+function getUniqueWrongTitleOptions(correctItem) {
+  const used = new Set([correctItem.title]);
+  const options = [];
+
+  for (const item of shuffle(allPaintings)) {
+    if (item.title === correctItem.title) continue;
+    if (used.has(item.title)) continue;
+    used.add(item.title);
+    options.push(item.title);
+    if (options.length === 3) break;
+  }
+
+  return options;
 }
 
 async function startGame() {
@@ -223,37 +301,39 @@ async function startGame() {
   current = 0;
   answered = false;
   hintUsed = false;
-  cache = {};
-  usedInGame = [];
-  pool = [...PAINTINGS].sort(() => Math.random() - 0.5);
+  currentItem = null;
 
-  document.getElementById('score-display').textContent = 0;
-  document.getElementById('round-display').textContent = 1;
+  document.getElementById('score-display').textContent = '0';
+  document.getElementById('round-display').textContent = '1';
   document.getElementById('total-display').textContent = ROUNDS;
   document.getElementById('endscreen').style.display = 'none';
   document.getElementById('error-msg').style.display = 'none';
   document.getElementById('game').style.display = 'none';
   document.getElementById('loading').style.display = 'flex';
+  document.getElementById('loading-text').textContent = 'Data laden...';
 
-  buildProgress();
+  try {
+    if (allPaintings.length === 0) {
+      allPaintings = await loadData();
+    }
 
-  // Prefetch first 8 for fast wrong answers
-  const prefetch = pool.slice(0, 8);
-  await Promise.all(prefetch.map(t => fetchPainting(t).catch(() => null)));
+    pool = shuffle(allPaintings).slice(0, Math.min(ROUNDS, allPaintings.length));
 
-  await loadNextRound();
+    buildProgress();
+    await loadNextRound();
+  } catch (error) {
+    console.error(error);
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('error-msg').style.display = 'block';
+  }
 }
 
 async function loadNextRound() {
   document.getElementById('game').style.display = 'none';
   document.getElementById('loading').style.display = 'flex';
-  document.getElementById('loading-text').textContent = 'Schilderij ophalen...';
+  document.getElementById('loading-text').textContent = 'Schilderij laden...';
 
-  let item = null;
-  while (!item && pool.length > 0) {
-    const title = pool.shift();
-    item = await fetchPainting(title);
-  }
+  const item = pool[current];
 
   if (!item) {
     document.getElementById('loading').style.display = 'none';
@@ -261,11 +341,12 @@ async function loadNextRound() {
     return;
   }
 
-  usedInGame.push(item);
   currentItem = item;
 
-  // Background prefetch next one
-  if (pool.length > 0) fetchPainting(pool[0]).catch(() => null);
+  const nextItem = pool[current + 1];
+  if (nextItem?.image) {
+    preloadImage(nextItem.image);
+  }
 
   showRound(item);
 }
@@ -310,22 +391,26 @@ function showRound(item) {
   document.getElementById('options').style.opacity = '0';
   loader.style.display = 'flex';
 
-  const askPainter = current % 2 === 0;
-  document.getElementById('question').textContent = askPainter
-    ? 'Wie schilderde dit werk?'
-    : 'Wat is de naam van dit schilderij?';
+  const askArtist = current % 2 === 0;
+  document.getElementById('question').textContent = askArtist
+    ? 'Wie is de schilder van dit werk?'
+    : 'Hoe heet dit schilderij?';
 
-  // Build wrong options from cache
-  const others = Object.values(cache).filter(d => d.title !== item.title).sort(() => Math.random() - 0.5).slice(0, 3);
-  const choices = [item, ...others].sort(() => Math.random() - 0.5);
+  const wrongOptions = askArtist
+    ? getUniqueWrongArtistOptions(item)
+    : getUniqueWrongTitleOptions(item);
+
+  const correctAnswer = askArtist ? item.artist : item.title;
+  const choices = shuffle([correctAnswer, ...wrongOptions]);
 
   const container = document.getElementById('options');
   container.innerHTML = '';
+
   choices.forEach(choice => {
     const btn = document.createElement('button');
     btn.className = 'option-btn';
-    btn.textContent = askPainter ? choice.description : choice.title;
-    btn.onclick = () => handleAnswer(btn, choice.title === item.title, askPainter, item);
+    btn.textContent = choice;
+    btn.onclick = () => handleAnswer(btn, choice === correctAnswer, correctAnswer);
     container.appendChild(btn);
   });
 
@@ -333,26 +418,32 @@ function showRound(item) {
 
   img.onload = () => {
     loader.style.display = 'none';
-    img.style.transition = 'opacity 0.4s';
     img.style.opacity = '1';
-    document.getElementById('question').style.transition = 'opacity 0.3s';
     document.getElementById('question').style.opacity = '1';
-    document.getElementById('options').style.transition = 'opacity 0.3s';
     document.getElementById('options').style.opacity = '1';
   };
+
   img.onerror = () => {
     loader.style.display = 'none';
     document.getElementById('question').style.opacity = '1';
     document.getElementById('options').style.opacity = '1';
   };
+
   img.src = '';
   img.src = item.image;
 }
 
-function handleAnswer(btn, isCorrect, askPainter, correct) {
+function handleAnswer(btn, isCorrect, correctAnswer) {
   if (answered) return;
   answered = true;
-  document.querySelectorAll('.option-btn').forEach(b => b.disabled = true);
+
+  document.querySelectorAll('.option-btn').forEach(b => {
+    b.disabled = true;
+    if (b.textContent === correctAnswer) {
+      b.classList.add('correct');
+    }
+  });
+
   document.getElementById('hint-btn').disabled = true;
 
   if (isCorrect) {
@@ -363,9 +454,7 @@ function handleAnswer(btn, isCorrect, askPainter, correct) {
     document.getElementById('score-display').textContent = score;
   } else {
     btn.classList.add('wrong');
-    const correctTxt = askPainter ? correct.description : correct.title;
-    document.querySelectorAll('.option-btn').forEach(b => { if (b.textContent === correctTxt) b.classList.add('correct'); });
-    document.getElementById('feedback').textContent = `Niet juist — het was: ${correctTxt}`;
+    document.getElementById('feedback').textContent = `Niet juist, het was: ${correctAnswer}`;
     document.getElementById('feedback').className = 'feedback wrong';
   }
 
@@ -375,7 +464,11 @@ function handleAnswer(btn, isCorrect, askPainter, correct) {
 function showHint() {
   if (answered || hintUsed || !currentItem) return;
   hintUsed = true;
-  document.getElementById('hint-box').textContent = currentItem.extract || 'Geen hint beschikbaar.';
+
+  const hintText = currentItem.extract?.trim()
+    || `${currentItem.title} van ${currentItem.artist}`;
+
+  document.getElementById('hint-box').textContent = hintText;
   document.getElementById('hint-box').style.display = 'block';
   document.getElementById('hint-btn').disabled = true;
 }
@@ -393,12 +486,14 @@ function showEnd() {
   document.getElementById('game').style.display = 'none';
   document.getElementById('endscreen').style.display = 'block';
   document.getElementById('final-score').textContent = score;
+
   const pct = score / (ROUNDS * 2);
-  let msg = pct >= 0.9 ? 'Meesterlijk! Je kent je kunst.'
+  const msg = pct >= 0.9 ? 'Meesterlijk! Je kent je kunst.'
     : pct >= 0.7 ? 'Indrukwekkend! Je hebt een scherp oog.'
     : pct >= 0.5 ? 'Niet slecht! Nog wat oefenen?'
     : pct >= 0.3 ? 'Een begin is er. Musea wachten op je!'
-    : 'Kunst is voor iedereen — ook voor jou!';
+    : 'Kunst is voor iedereen, ook voor jou!';
+
   document.getElementById('final-msg').textContent = msg;
 }
 
