@@ -43,6 +43,32 @@
   .score-bar { display: flex; gap: 1.25rem; justify-content: center; margin-top: 0.6rem; font-size: 0.75rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
   .score-bar strong { color: var(--ink); font-family: 'Playfair Display', serif; font-size: 1rem; }
 
+  .header-top {
+    width: 100%;
+    max-width: 680px;
+    margin: 0 auto;
+    display: flex;
+    justify-content: flex-end;
+    margin-bottom: 0.6rem;
+  }
+
+  .lang-btn {
+    background: transparent;
+    border: 1.5px solid var(--border);
+    border-radius: 999px;
+    padding: 0.45rem 0.9rem;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.78rem;
+    color: var(--muted);
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .lang-btn:hover {
+    border-color: var(--gold);
+    color: var(--ink);
+  }
+
   main { width: 100%; max-width: 680px; padding: 1.5rem 1rem 3rem; }
 
   #loading { display: flex; flex-direction: column; align-items: center; gap: 1rem; padding: 4rem 0; }
@@ -167,11 +193,14 @@
 <body>
 
 <header>
+  <div class="header-top">
+    <button class="lang-btn" id="lang-toggle" onclick="toggleLanguage()">NL / EN</button>
+  </div>
   <div class="logo">Art <span>Guesser</span></div>
-  <div class="tagline">Ken jij de grote meesters?</div>
+  <div class="tagline" id="tagline">Ken jij de grote meesters?</div>
   <div class="score-bar">
-    <div>Score <strong id="score-display">0</strong></div>
-    <div>Ronde <strong id="round-display">0</strong> / <strong id="total-display">10</strong></div>
+    <div><span id="score-label">Score</span> <strong id="score-display">0</strong></div>
+    <div><span id="round-text-label">Ronde</span> <strong id="round-display">0</strong> / <strong id="total-display">10</strong></div>
   </div>
 </header>
 
@@ -204,9 +233,9 @@
 
   <div id="endscreen">
     <div class="final-score" id="final-score"></div>
-    <div class="final-label">punten behaald</div>
+    <div class="final-label" id="final-label">punten behaald</div>
     <div class="final-msg" id="final-msg"></div>
-    <button class="restart-btn" onclick="startGame()">Opnieuw spelen</button>
+    <button class="restart-btn" id="restart-btn" onclick="startGame()">Opnieuw spelen</button>
   </div>
 
   <div id="error-msg">Kon data.json niet laden. Controleer of het bestand in dezelfde map staat als index.html en probeer opnieuw.</div>
@@ -215,6 +244,59 @@
 <script>
 const ROUNDS = 10;
 const DATA_URL = './data.json';
+
+const translations = {
+  nl: {
+    htmlLang: 'nl',
+    tagline: 'Ken jij de grote meesters?',
+    scoreLabel: 'Score',
+    roundLabel: 'Ronde',
+    loadingData: 'Data laden...',
+    loadingPainting: 'Schilderij laden...',
+    imgLoading: 'Laden...',
+    roundText: (current, total) => `Vraag ${current} van ${total}`,
+    askArtist: 'Wie is de schilder van dit werk?',
+    askTitle: 'Hoe heet dit schilderij?',
+    correct: 'Correct!',
+    wrong: answer => `Niet juist, het was: ${answer}`,
+    finalLabel: 'punten behaald',
+    restart: 'Opnieuw spelen',
+    error: 'Kon data.json niet laden. Controleer of het bestand in dezelfde map staat als index.html en probeer opnieuw.',
+    endMessages: {
+      master: 'Meesterlijk! Je kent je kunst.',
+      impressive: 'Indrukwekkend! Je hebt een scherp oog.',
+      decent: 'Niet slecht! Nog wat oefenen?',
+      start: 'Een begin is er. Musea wachten op je!',
+      everyone: 'Kunst is voor iedereen, ook voor jou!'
+    }
+  },
+  en: {
+    htmlLang: 'en',
+    tagline: 'Do you know the great masters?',
+    scoreLabel: 'Score',
+    roundLabel: 'Round',
+    loadingData: 'Loading data...',
+    loadingPainting: 'Loading painting...',
+    imgLoading: 'Loading...',
+    roundText: (current, total) => `Question ${current} of ${total}`,
+    askArtist: 'Who painted this work?',
+    askTitle: 'What is the name of this painting?',
+    correct: 'Correct!',
+    wrong: answer => `Not correct, it was: ${answer}`,
+    finalLabel: 'points scored',
+    restart: 'Play again',
+    error: 'Could not load data.json. Check whether the file is in the same folder as index.html and try again.',
+    endMessages: {
+      master: 'Masterful! You really know your art.',
+      impressive: 'Impressive! You have a sharp eye.',
+      decent: 'Not bad. A little more practice?',
+      start: 'A good start. The museums are waiting for you!',
+      everyone: 'Art is for everyone, including you!'
+    }
+  }
+};
+
+let currentLanguage = 'nl';
 
 let allPaintings = [];
 let pool = [];
@@ -258,6 +340,59 @@ function shuffle(array) {
   return copy;
 }
 
+function t() {
+  return translations[currentLanguage];
+}
+
+function updateStaticTexts() {
+  const lang = t();
+  document.documentElement.lang = lang.htmlLang;
+  document.getElementById('tagline').textContent = lang.tagline;
+  document.getElementById('score-label').textContent = lang.scoreLabel;
+  document.getElementById('round-text-label').textContent = lang.roundLabel;
+  document.getElementById('final-label').textContent = lang.finalLabel;
+  document.getElementById('restart-btn').textContent = lang.restart;
+  document.getElementById('error-msg').textContent = lang.error;
+
+  const imgLoaderText = document.querySelector('#img-loader span');
+  if (imgLoaderText) imgLoaderText.textContent = lang.imgLoading;
+}
+
+function refreshVisibleTexts() {
+  updateStaticTexts();
+
+  if (document.getElementById('loading').style.display !== 'none') {
+    const loadingText = document.getElementById('loading-text').textContent;
+    if (loadingText.includes('data') || loadingText.includes('Data')) {
+      document.getElementById('loading-text').textContent = t().loadingData;
+    } else {
+      document.getElementById('loading-text').textContent = t().loadingPainting;
+    }
+  }
+
+  if (document.getElementById('game').style.display !== 'none' && currentItem) {
+    const askArtist = current % 2 === 0;
+    document.getElementById('round-label').textContent = t().roundText(current + 1, ROUNDS);
+    document.getElementById('question').textContent = askArtist ? t().askArtist : t().askTitle;
+  }
+
+  if (document.getElementById('endscreen').style.display !== 'none') {
+    const pct = score / (ROUNDS * 2);
+    const messages = t().endMessages;
+    const msg = pct >= 0.9 ? messages.master
+      : pct >= 0.7 ? messages.impressive
+      : pct >= 0.5 ? messages.decent
+      : pct >= 0.3 ? messages.start
+      : messages.everyone;
+    document.getElementById('final-msg').textContent = msg;
+  }
+}
+
+function toggleLanguage() {
+  currentLanguage = currentLanguage === 'nl' ? 'en' : 'nl';
+  refreshVisibleTexts();
+}
+
 function preloadImage(src) {
   if (!src) return;
   const img = new Image();
@@ -299,6 +434,7 @@ function getUniqueWrongTitleOptions(correctItem) {
 }
 
 async function startGame() {
+  updateStaticTexts();
   score = 0;
   current = 0;
   answered = false;
@@ -311,7 +447,7 @@ async function startGame() {
   document.getElementById('error-msg').style.display = 'none';
   document.getElementById('game').style.display = 'none';
   document.getElementById('loading').style.display = 'flex';
-  document.getElementById('loading-text').textContent = 'Data laden...';
+  document.getElementById('loading-text').textContent = t().loadingData;
 
   try {
     if (allPaintings.length === 0) {
@@ -332,7 +468,7 @@ async function startGame() {
 async function loadNextRound() {
   document.getElementById('game').style.display = 'none';
   document.getElementById('loading').style.display = 'flex';
-  document.getElementById('loading-text').textContent = 'Schilderij laden...';
+  document.getElementById('loading-text').textContent = t().loadingPainting;
 
   const item = pool[current];
 
@@ -376,7 +512,7 @@ function showRound(item) {
 
   document.getElementById('loading').style.display = 'none';
   document.getElementById('game').style.display = 'block';
-  document.getElementById('round-label').textContent = `Vraag ${current + 1} van ${ROUNDS}`;
+  document.getElementById('round-label').textContent = t().roundText(current + 1, ROUNDS);
   document.getElementById('round-display').textContent = current + 1;
   document.getElementById('feedback').textContent = '';
   document.getElementById('feedback').className = 'feedback';
@@ -393,8 +529,8 @@ function showRound(item) {
 
   const askArtist = current % 2 === 0;
   document.getElementById('question').textContent = askArtist
-    ? 'Wie is de schilder van dit werk?'
-    : 'Hoe heet dit schilderij?';
+    ? t().askArtist
+    : t().askTitle;
 
   const wrongOptions = askArtist
     ? getUniqueWrongArtistOptions(item)
@@ -451,13 +587,13 @@ function handleAnswer(btn, isCorrect, correctAnswer) {
 
   if (isCorrect) {
     btn.classList.add('correct');
-    document.getElementById('feedback').textContent = 'Correct!';
+    document.getElementById('feedback').textContent = t().correct;
     document.getElementById('feedback').className = 'feedback correct';
     score += 2;
     document.getElementById('score-display').textContent = score;
   } else {
     btn.classList.add('wrong');
-    document.getElementById('feedback').textContent = `Niet juist, het was: ${correctAnswer}`;
+    document.getElementById('feedback').textContent = t().wrong(correctAnswer);
     document.getElementById('feedback').className = 'feedback wrong';
   }
 
@@ -481,11 +617,12 @@ function showEnd() {
   document.getElementById('final-score').textContent = score;
 
   const pct = score / (ROUNDS * 2);
-  const msg = pct >= 0.9 ? 'Meesterlijk! Je kent je kunst.'
-    : pct >= 0.7 ? 'Indrukwekkend! Je hebt een scherp oog.'
-    : pct >= 0.5 ? 'Niet slecht! Nog wat oefenen?'
-    : pct >= 0.3 ? 'Een begin is er. Musea wachten op je!'
-    : 'Kunst is voor iedereen, ook voor jou!';
+  const messages = t().endMessages;
+  const msg = pct >= 0.9 ? messages.master
+    : pct >= 0.7 ? messages.impressive
+    : pct >= 0.5 ? messages.decent
+    : pct >= 0.3 ? messages.start
+    : messages.everyone;
 
   document.getElementById('final-msg').textContent = msg;
 }
