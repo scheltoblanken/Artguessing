@@ -374,6 +374,11 @@ function refreshVisibleTexts() {
     const askArtist = current % 2 === 0;
     document.getElementById('round-label').textContent = t().roundText(current + 1, ROUNDS);
     document.getElementById('question').textContent = askArtist ? t().askArtist : t().askTitle;
+
+    const hintBox = document.getElementById('hint-box');
+    if (hintBox.style.display !== 'none') {
+      hintBox.textContent = getHintText(currentItem);
+    }
   }
 
   if (document.getElementById('endscreen').style.display !== 'none') {
@@ -400,7 +405,27 @@ function preloadImage(src) {
 }
 
 function getHintText(item) {
-  return item?.extract?.trim() || `${item?.title || 'Onbekend werk'} van ${item?.artist || 'onbekende kunstenaar'}`;
+  if (!item) return '';
+
+  if (currentLanguage === 'en') {
+    const parts = [];
+    const title = item.title || 'Unknown work';
+    const artist = item.artist || 'unknown artist';
+    const date = item.date ? `, ${item.date}` : '';
+    parts.push(`${title} is a painting by ${artist}${date}.`);
+    if (item.style) {
+      parts.push(`Style: ${item.style}.`);
+    }
+    return parts.join(' ');
+  }
+
+  if (item.extract?.trim()) return item.extract.trim();
+
+  const title = item.title || 'Onbekend werk';
+  const artist = item.artist || 'onbekende kunstenaar';
+  const date = item.date ? ` uit ${item.date}` : '';
+  const style = item.style ? ` Stijl: ${item.style}.` : '';
+  return `${title} is een schilderij van ${artist}${date}.${style}`;
 }
 
 function getUniqueWrongArtistOptions(correctItem) {
