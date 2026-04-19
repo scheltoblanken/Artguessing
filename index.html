@@ -198,7 +198,6 @@
     <div class="feedback" id="feedback"></div>
     <div class="hint-box" id="hint-box"></div>
     <div class="bottom-row">
-      <button class="hint-btn" id="hint-btn" onclick="showHint()">Hint</button>
       <button class="next-btn" id="next-btn" onclick="nextRound()">Volgende →</button>
     </div>
   </div>
@@ -222,7 +221,6 @@ let pool = [];
 let current = 0;
 let score = 0;
 let answered = false;
-let hintUsed = false;
 let currentItem = null;
 
 async function loadData() {
@@ -266,6 +264,10 @@ function preloadImage(src) {
   img.src = src;
 }
 
+function getHintText(item) {
+  return item?.extract?.trim() || `${item?.title || 'Onbekend werk'} van ${item?.artist || 'onbekende kunstenaar'}`;
+}
+
 function getUniqueWrongArtistOptions(correctItem) {
   const used = new Set([correctItem.artist]);
   const options = [];
@@ -300,7 +302,6 @@ async function startGame() {
   score = 0;
   current = 0;
   answered = false;
-  hintUsed = false;
   currentItem = null;
 
   document.getElementById('score-display').textContent = '0';
@@ -372,7 +373,6 @@ function updateProgress() {
 
 function showRound(item) {
   answered = false;
-  hintUsed = false;
 
   document.getElementById('loading').style.display = 'none';
   document.getElementById('game').style.display = 'block';
@@ -381,8 +381,8 @@ function showRound(item) {
   document.getElementById('feedback').textContent = '';
   document.getElementById('feedback').className = 'feedback';
   document.getElementById('hint-box').style.display = 'none';
+  document.getElementById('hint-box').textContent = '';
   document.getElementById('next-btn').style.display = 'none';
-  document.getElementById('hint-btn').disabled = false;
 
   const img = document.getElementById('painting-img');
   const loader = document.getElementById('img-loader');
@@ -416,21 +416,26 @@ function showRound(item) {
 
   updateProgress();
 
-  img.onload = () => {
+  const revealRound = () => {
     loader.style.display = 'none';
     img.style.opacity = '1';
     document.getElementById('question').style.opacity = '1';
     document.getElementById('options').style.opacity = '1';
   };
 
-  img.onerror = () => {
-    loader.style.display = 'none';
-    document.getElementById('question').style.opacity = '1';
-    document.getElementById('options').style.opacity = '1';
+  const preloader = new Image();
+  preloader.onload = () => {
+    img.src = item.image;
+    revealRound();
+  };
+
+  preloader.onerror = () => {
+    img.src = item.image;
+    revealRound();
   };
 
   img.src = '';
-  img.src = item.image;
+  preloader.src = item.image;
 }
 
 function handleAnswer(btn, isCorrect, correctAnswer) {
@@ -444,13 +449,11 @@ function handleAnswer(btn, isCorrect, correctAnswer) {
     }
   });
 
-  document.getElementById('hint-btn').disabled = true;
-
   if (isCorrect) {
     btn.classList.add('correct');
-    document.getElementById('feedback').textContent = hintUsed ? 'Correct!' : 'Correct! +2 bonus voor geen hint.';
+    document.getElementById('feedback').textContent = 'Correct!';
     document.getElementById('feedback').className = 'feedback correct';
-    score += hintUsed ? 1 : 2;
+    score += 2;
     document.getElementById('score-display').textContent = score;
   } else {
     btn.classList.add('wrong');
@@ -458,19 +461,9 @@ function handleAnswer(btn, isCorrect, correctAnswer) {
     document.getElementById('feedback').className = 'feedback wrong';
   }
 
-  document.getElementById('next-btn').style.display = 'inline-block';
-}
-
-function showHint() {
-  if (answered || hintUsed || !currentItem) return;
-  hintUsed = true;
-
-  const hintText = currentItem.extract?.trim()
-    || `${currentItem.title} van ${currentItem.artist}`;
-
-  document.getElementById('hint-box').textContent = hintText;
+  document.getElementById('hint-box').textContent = getHintText(currentItem);
   document.getElementById('hint-box').style.display = 'block';
-  document.getElementById('hint-btn').disabled = true;
+  document.getElementById('next-btn').style.display = 'inline-block';
 }
 
 async function nextRound() {
