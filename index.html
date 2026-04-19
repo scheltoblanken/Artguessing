@@ -153,6 +153,7 @@
     font-size: clamp(1.1rem, 3vw, 1.4rem);
     margin-bottom: 1.5rem;
     line-height: 1.4;
+    transition: opacity 0.4s;
   }
 
   .options {
@@ -160,6 +161,7 @@
     grid-template-columns: 1fr 1fr;
     gap: 0.75rem;
     margin-bottom: 2rem;
+    transition: opacity 0.4s;
   }
 
   @media (max-width: 500px) {
@@ -500,8 +502,19 @@ function showRound() {
 
   document.getElementById('round-label').textContent = `Vraag ${current + 1} van ${ROUNDS}`;
   document.getElementById('round-display').textContent = current + 1;
-  document.getElementById('painting-img').src = item.originalImage || item.image;
-  document.getElementById('painting-img').alt = 'Schilderij om te raden';
+  const img = document.getElementById('painting-img');
+  img.alt = 'Schilderij om te raden';
+  img.style.opacity = '0';
+  document.getElementById('question').style.opacity = '0';
+  document.getElementById('options').style.opacity = '0';
+
+  img.onload = () => {
+    img.style.transition = 'opacity 0.4s';
+    img.style.opacity = '1';
+    document.getElementById('question').style.opacity = '1';
+    document.getElementById('options').style.opacity = '1';
+  };
+  img.src = item.originalImage || item.image;
   document.getElementById('feedback').textContent = '';
   document.getElementById('feedback').className = 'feedback';
   document.getElementById('hint-box').style.display = 'none';
